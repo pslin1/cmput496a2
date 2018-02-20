@@ -49,20 +49,41 @@ class GtpConnectionGo2(gtp_connection.GtpConnection):
             self.respond('Error: {}'.format(str(e)))
 
     def timelimit_cmd(self, args):
-        self.timelimit = float(args[0])
-        print(type(self.timelimit))
+        new_limit = int(args[0])
+        if new_limit < 1 or new_limit > 100:
+            self.respond("Usage: timelimit must be between 1 and 100 inclusive")
+            return
+        self.timelimit = new_limit
+        self.respond(self.timelimit)
 
     def negamaxBoolean(self, colour):
-        #if endofgame
-        #return false
-
-        legal_moves = GoBoardUtil.generate_legal_moves(self.board, colour)
-        for m in legal_moves:
-            print(m)
+        time_spent = time.process_time() - self.entry_time     
+        if time_spent > self.timelimit:
+            return "unknown"
         
-
+        if self.board.end_of_game():
+            return self.board.score(self.go_engine.komi) 
+        
+        non_eye_moves = GoBoardUtil.generate_legal_moves(self.board, colour).strip().split(" ")
+        if non_eye_moves[0] == '':
+            return False
+        non_eye_moves = [GoBoardUtil.move_to_coord(m, self.board.size) for m in non_eye_moves]
+        non_eye_moves = [self.board._coord_to_point(m[0], m[1]) for m in non_eye_moves]
+        non_eye_moves = [m for m in non_eye_moves if not self.board.is_eye(m,colour)]
+        print(non_eye_moves)
+        for m in non_eye_moves:
+            self.board.move(m, colour)
+            success = not self.negamaxBoolean(GoBoardUtil.opponent(colour))
+            #print(success, colour)
+            self.board.undo_move()
+            if success:
+                return True
+        return False        
+        
     def solve_cmd(self, args):
-        self.negamaxBoolean(1)
-        #print(self.board.current_player) #1 is black, 2 is white
-        #print("solve_cmd")
+        self.entry_time = time.process_time()
+        game_end = False
+        while not game_end:
+            game_end = self.negamaxBoolean(1)
+            print(game_end)
 

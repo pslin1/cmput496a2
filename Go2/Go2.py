@@ -27,7 +27,14 @@ class Go2():
         self.version = 0.1
 
     def get_move(self,board, color):
-        return GoBoardUtil.generate_random_move(board,color,True)
+        # unsure of the return values expected from the connection
+        can_win, move_to_take = self.con.solve_cmd()
+        if can_win:
+            print("win")
+            return move_to_take
+        else:
+            print("random")
+            return GoBoardUtil.generate_random_move(board,color,True)
     
 
 def run():

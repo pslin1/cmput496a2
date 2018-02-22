@@ -29,6 +29,7 @@ class GtpConnectionGo2(gtp_connection.GtpConnection):
             SIZExSIZE array representing the current board state
         """
         gtp_connection.GtpConnection.__init__(self, go_engine, board, outfile, debug_mode)
+        self.go_engine.con = self
         self.timelimit = 1
         self.commands["timelimit"] = self.timelimit_cmd
         self.argmap["timelimit"] = (1, "Usage: timelimit {time in seconds}")
@@ -59,31 +60,47 @@ class GtpConnectionGo2(gtp_connection.GtpConnection):
     def negamaxBoolean(self, colour):
         time_spent = time.process_time() - self.entry_time     
         if time_spent > self.timelimit:
-            return "unknown"
+            self.timed_out = True
+            return "unknown", None
         
         if self.board.end_of_game():
-            return self.board.score(self.go_engine.komi) 
-        
+            col, score = self.board.score(self.go_engine.komi)
+            print(col, score)
+            # we don't need the score or the move. We are simply returning which colour has won from the perspective of this colour
+            if col == colour:
+                return True, None
+            else:
+                return False, None
+            
         non_eye_moves = GoBoardUtil.generate_legal_moves(self.board, colour).strip().split(" ")
         if non_eye_moves[0] == '':
-            return False
+            # the game isn't over but this colour has no moves to take and therefore has not won and cannot win, return False
+            return False, None
         non_eye_moves = [GoBoardUtil.move_to_coord(m, self.board.size) for m in non_eye_moves]
         non_eye_moves = [self.board._coord_to_point(m[0], m[1]) for m in non_eye_moves]
         non_eye_moves = [m for m in non_eye_moves if not self.board.is_eye(m,colour)]
-        print(non_eye_moves)
+        np.random.shuffle(non_eye_moves)
         for m in non_eye_moves:
             self.board.move(m, colour)
-            success = not self.negamaxBoolean(GoBoardUtil.opponent(colour))
-            #print(success, colour)
+            opponent_success, move = self.negamaxBoolean(GoBoardUtil.opponent(colour))
+            success = not opponent_success
             self.board.undo_move()
             if success:
-                return True
-        return False        
+                # most interested in obtaining the move that generated the win for the first iteration into this method, the other sequence of moves are lost
+                return True, m
+        # we don't need to know which move results in a loss
+        return False, None        
         
-    def solve_cmd(self, args):
+    def solve_cmd(self, args=None):
         self.entry_time = time.process_time()
-        game_end = False
-        while not game_end:
-            game_end = self.negamaxBoolean(1)
-            print(game_end)
+        self.timed_out = False
+        can_win = False
+        while not can_win:
+            can_win, move = self.negamaxBoolean(1)
+        if self.timed_out:
+            print("timed out")
+            return(False, None)
+        move_formatted = GoBoardUtil.format_point(self.board._point_to_coord(move))
+        print("solved", can_win, move_formatted)
+        return(can_win, move)
 

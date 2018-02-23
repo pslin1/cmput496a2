@@ -61,11 +61,10 @@ class GtpConnectionGo2(gtp_connection.GtpConnection):
         time_spent = time.process_time() - self.entry_time     
         if time_spent > self.timelimit:
             self.timed_out = True
-            return "unknown", None
+            return False, None
         
         if self.board.end_of_game():
             col, score = self.board.score(self.go_engine.komi)
-            print(col, score)
             # we don't need the score or the move. We are simply returning which colour has won from the perspective of this colour
             if col == colour:
                 return True, None
@@ -74,12 +73,15 @@ class GtpConnectionGo2(gtp_connection.GtpConnection):
             
         non_eye_moves = GoBoardUtil.generate_legal_moves(self.board, colour).strip().split(" ")
         if non_eye_moves[0] == '':
-            # the game isn't over but this colour has no moves to take and therefore has not won and cannot win, return False
-            return False, None
+            # the game isn't over but this colour has no moves to take and will pass
+            non_eye_moves = []
         non_eye_moves = [GoBoardUtil.move_to_coord(m, self.board.size) for m in non_eye_moves]
         non_eye_moves = [self.board._coord_to_point(m[0], m[1]) for m in non_eye_moves]
         non_eye_moves = [m for m in non_eye_moves if not self.board.is_eye(m,colour)]
         np.random.shuffle(non_eye_moves)
+        if non_eye_moves == []:
+            # since the player has no moves, instead make it pass
+            non_eye_moves = [None]
         for m in non_eye_moves:
             self.board.move(m, colour)
             opponent_success, move = self.negamaxBoolean(GoBoardUtil.opponent(colour))
@@ -92,15 +94,21 @@ class GtpConnectionGo2(gtp_connection.GtpConnection):
         return False, None        
         
     def solve_cmd(self, args=None):
+        colour = self.board.current_player
         self.entry_time = time.process_time()
         self.timed_out = False
         can_win = False
-        while not can_win:
-            can_win, move = self.negamaxBoolean(1)
+        can_win, move = self.negamaxBoolean(colour)
         if self.timed_out:
-            print("timed out")
+            self.respond("unknown")
             return(False, None)
-        move_formatted = GoBoardUtil.format_point(self.board._point_to_coord(move))
-        print("solved", can_win, move_formatted)
+        if can_win:
+            if move:
+                formatted_move = GoBoardUtil.format_point(self.board._point_to_coord(move))
+            else:
+                formatted_move = GoBoardUtil.format_point(move)
+            self.respond(GoBoardUtil.int_to_color(colour) + ' ' + formatted_move)
+        else:
+            self.respond(GoBoardUtil.int_to_color(GoBoardUtil.opponent(colour)))
         return(can_win, move)
 

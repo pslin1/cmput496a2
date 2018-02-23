@@ -55,7 +55,7 @@ class GtpConnectionGo2(gtp_connection.GtpConnection):
             self.respond("Usage: timelimit must be between 1 and 100 inclusive")
             return
         self.timelimit = new_limit
-        self.respond(self.timelimit)
+        self.respond()
 
     def negamaxBoolean(self, colour):
         time_spent = time.process_time() - self.entry_time     
@@ -78,7 +78,9 @@ class GtpConnectionGo2(gtp_connection.GtpConnection):
         non_eye_moves = [GoBoardUtil.move_to_coord(m, self.board.size) for m in non_eye_moves]
         non_eye_moves = [self.board._coord_to_point(m[0], m[1]) for m in non_eye_moves]
         non_eye_moves = [m for m in non_eye_moves if not self.board.is_eye(m,colour)]
-        np.random.shuffle(non_eye_moves)
+        non_eye_moves.sort(key=self.my_key)
+        #sort here and get rid of shuffle
+        #np.random.shuffle(non_eye_moves)
         if non_eye_moves == []:
             # since the player has no moves, instead make it pass
             non_eye_moves = [None]
@@ -93,6 +95,29 @@ class GtpConnectionGo2(gtp_connection.GtpConnection):
         # we don't need to know which move results in a loss
         return False, None        
         
+    def get_benson_score(self, move, colour):
+        #print(move)
+        #print(colour)
+        self.board.move(move, colour)
+        safety_list = self.board.find_safety(colour)
+        #print(safety_list)
+        benson_score = len(safety_list)
+        self.board.undo_move()
+        #print(benson_score)
+        return benson_score
+
+    def get_capture_score(self, colour):
+        if colour == WHITE:
+            return self.board.white_captures
+        else:
+            return self.board.black_captures
+
+    def my_key(self, move):
+        colour = self.board.current_player
+        benson_score = self.get_benson_score(move, colour)
+        capture_score = self.get_capture_score(colour)
+        return (-benson_score, -capture_score)
+
     def solve_cmd(self, args=None):
         colour = self.board.current_player
         self.entry_time = time.process_time()

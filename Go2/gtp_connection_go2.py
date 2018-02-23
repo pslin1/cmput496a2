@@ -131,7 +131,7 @@ class GtpConnectionGo2(gtp_connection.GtpConnection):
                     formatted_move = GoBoardUtil.format_point(self.board._point_to_coord(move))
                 else:
                     formatted_move = GoBoardUtil.format_point(move)
-                    self.respond(GoBoardUtil.int_to_color(colour) + ' ' + formatted_move)
+                self.respond(GoBoardUtil.int_to_color(colour) + ' ' + formatted_move)
             else:
                 self.respond(GoBoardUtil.int_to_color(GoBoardUtil.opponent(colour)))
 

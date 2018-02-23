@@ -27,7 +27,7 @@ class Go2():
         self.version = 0.1
 
     def get_move(self,board, color):
-        can_win, move_to_take = self.con.solve_cmd()
+        can_win, move_to_take = self.con.solve()
         if can_win:
             return move_to_take
         else:

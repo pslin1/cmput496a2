@@ -78,9 +78,7 @@ class GtpConnectionGo2(gtp_connection.GtpConnection):
         non_eye_moves = [GoBoardUtil.move_to_coord(m, self.board.size) for m in non_eye_moves]
         non_eye_moves = [self.board._coord_to_point(m[0], m[1]) for m in non_eye_moves]
         non_eye_moves = [m for m in non_eye_moves if not self.board.is_eye(m,colour)]
-        non_eye_moves.sort(key=self.my_key)
-        #sort here and get rid of shuffle
-        #np.random.shuffle(non_eye_moves)
+        non_eye_moves.sort(key=self.my_key, reverse=True)
         if non_eye_moves == []:
             # since the player has no moves, instead make it pass
             non_eye_moves = [None]
@@ -95,45 +93,45 @@ class GtpConnectionGo2(gtp_connection.GtpConnection):
         # we don't need to know which move results in a loss
         return False, None        
         
-    def get_benson_score(self, move, colour):
-        #print(move)
-        #print(colour)
-        self.board.move(move, colour)
-        safety_list = self.board.find_safety(colour)
-        #print(safety_list)
-        benson_score = len(safety_list)
-        self.board.undo_move()
-        #print(benson_score)
-        return benson_score
+    def get_benson_score(self, colour):
+        return len(self.board.find_safety(colour))
 
-    def get_capture_score(self, colour):
-        if colour == WHITE:
-            return self.board.white_captures
+    def get_capture_score(self):
+        caps = self.board.captured_stones[-1]
+        if caps:
+            return len(caps)
         else:
-            return self.board.black_captures
+            return 0
 
     def my_key(self, move):
         colour = self.board.current_player
-        benson_score = self.get_benson_score(move, colour)
-        capture_score = self.get_capture_score(colour)
-        return (-benson_score, -capture_score)
+        self.board.move(move, colour)
+        benson_score = self.get_benson_score(colour)
+        capture_score = self.get_capture_score()
+        self.board.undo_move()
+        return (benson_score, capture_score)
 
-    def solve_cmd(self, args=None):
+    def solve(self, args=None):
         colour = self.board.current_player
         self.entry_time = time.process_time()
         self.timed_out = False
-        can_win = False
         can_win, move = self.negamaxBoolean(colour)
         if self.timed_out:
-            self.respond("unknown")
             return(False, None)
-        if can_win:
-            if move:
-                formatted_move = GoBoardUtil.format_point(self.board._point_to_coord(move))
-            else:
-                formatted_move = GoBoardUtil.format_point(move)
-            self.respond(GoBoardUtil.int_to_color(colour) + ' ' + formatted_move)
+        return(can_win, move) 
+    
+    def solve_cmd(self, args=None):
+        colour = self.board.current_player
+        can_win, move = self.solve(args)
+        if self.timed_out:
+            self.respond("unknown")
         else:
-            self.respond(GoBoardUtil.int_to_color(GoBoardUtil.opponent(colour)))
-        return(can_win, move)
+            if can_win:
+                if move:
+                    formatted_move = GoBoardUtil.format_point(self.board._point_to_coord(move))
+                else:
+                    formatted_move = GoBoardUtil.format_point(move)
+                    self.respond(GoBoardUtil.int_to_color(colour) + ' ' + formatted_move)
+            else:
+                self.respond(GoBoardUtil.int_to_color(GoBoardUtil.opponent(colour)))
 
